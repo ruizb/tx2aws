@@ -1,0 +1,33 @@
+{
+  "name": "tx2aws",
+  "version": "0.1.0",
+  "description": "Get Transifex translations and push them on AWS S3",
+  "main": "dist/index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "babel src -d dist",
+    "watch": "babel -w src -d dist",
+    "version": "npm run build",
+    "postversion": "git push && git push --tags"
+  },
+  "files": [
+    "dist"
+  ],
+  "author": "Bnoit Ruiz <benoit.ruiz01@gmail.com>",
+  "license": "ISC",
+  "dependencies": {
+    "aws-sdk": "^2.4.11",
+    "bluebird": "^3.4.1",
+    "chalk": "^1.1.3",
+    "lodash": "^4.14.1",
+    "mkdirp": "^0.5.1",
+    "rc": "^1.1.6",
+    "rx": "^4.1.0",
+    "transifex": "^1.4.4"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.0.0",
+    "babel-core": "^6.10.4",
+    "babel-preset-es2015": "^6.9.0"
+  }
+}
