@@ -51,10 +51,7 @@ export class TransifexService {
   }
 
   getFallbackTranslationsPromiseStream() {
-    return this.getFallbackTranslationsStream()
-      .flatMap(language => rx.Observable.fromPromise(this.getTranslations(this.config.transifex.resource, language)))
-      // JSON parse each response
-      .map(res => JSON.parse(res));
+    return this._handleTranslationsStream(this.getFallbackTranslationsStream())
   }
 
   getTranslationsStream() {
@@ -64,23 +61,26 @@ export class TransifexService {
   }
 
   getTranslationsPromiseStream() {
-    return this.getTranslationsStream()
-      // gather getTranslations promises in an array
-      .reduce((list, language) => {
-        list.push(rx.Observable.fromPromise(this.getTranslations(this.config.transifex.resource, language)));
-        return list;
-      }, [])
-      // wait for all the promises to fulfil
-      .flatMap(languages => rx.Observable.forkJoin(languages))
-      // split the array response
-      .flatMap(res => rx.Observable.from(res))
-      // JSON parse each response
-      .map(res => JSON.parse(res));
+    return this._handleTranslationsStream(this.getTranslationsStream())
   }
 
   getFinalTranslationsStream() {
     return rx.Observable.zip(this.getFallbackTranslationsStream(), this.getFallbackTranslationsPromiseStream())
       .concat(rx.Observable.zip(this.getTranslationsStream(), this.getTranslationsPromiseStream()));
+  }
+
+  _handleTranslationsStream(stream) {
+    return stream
+      .flatMap(language =>
+        rx.Observable
+          .just(language)
+          .concat(
+            rx.Observable
+              .fromPromise(this.getTranslations(this.config.transifex.resource, language))
+              .map(res => JSON.parse(res))
+          )
+          .toArray()
+      );
   }
 
 }
