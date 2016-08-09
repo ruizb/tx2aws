@@ -51,26 +51,7 @@ export class TransifexService {
   }
 
   getFallbackTranslationsPromiseStream() {
-    return this._handleTranslationsStream(this.getFallbackTranslationsStream())
-  }
-
-  getTranslationsStream() {
-    return this.getLanguagesStream()
-      // get all the non-fallback languages
-      .filter(language => language !== this.config.transifex.fallbackLanguage);
-  }
-
-  getTranslationsPromiseStream() {
-    return this._handleTranslationsStream(this.getTranslationsStream())
-  }
-
-  getFinalTranslationsStream() {
-    return rx.Observable.zip(this.getFallbackTranslationsStream(), this.getFallbackTranslationsPromiseStream())
-      .concat(rx.Observable.zip(this.getTranslationsStream(), this.getTranslationsPromiseStream()));
-  }
-
-  _handleTranslationsStream(stream) {
-    return stream
+    return this.getFallbackTranslationsStream()
       .flatMap(language =>
         rx.Observable
           .just(language)
@@ -80,6 +61,41 @@ export class TransifexService {
               .map(res => JSON.parse(res))
           )
           .toArray()
+      );
+  }
+
+  getTranslationsStream() {
+    return this.getLanguagesStream()
+      // get all the non-fallback languages
+      .filter(language => language !== this.config.transifex.fallbackLanguage);
+  }
+
+  getTranslationsPromiseStream() {
+    const fallbackStream = this.getFallbackTranslationsPromiseStream();
+    return fallbackStream
+      .concat(
+        this.getTranslationsStream() // ---en---fr---|->
+        .flatMap(language =>
+          rx.Observable
+            .just(language) // ---en---|-> (then on next iteration: ---fr---|->)
+            .concat(
+              fallbackStream
+                .zip( // ---[['en_US', {en_US translations}], {en translations}]---|->
+                  rx.Observable
+                    .fromPromise(this.getTranslations(this.config.transifex.resource, language))
+                    .map(res => JSON.parse(res))
+                )
+                .map(res => {
+                  // res looks like: [['en_US', {en_US translations}], {en translations}]
+                  // output must look like: {en translations with fallback if needed}
+                  const fallbackTranslations = _.last(_.first(res));
+                  return _.mapValues(_.last(res), (translation, translationKey) =>
+                    (translation === translationKey) ? fallbackTranslations[translationKey] : translation
+                  );
+                })
+            )
+            .toArray() // ---['en', {en translations with fallback if needed}]---|->
+        )
       );
   }
 

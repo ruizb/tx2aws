@@ -72,10 +72,9 @@ console.log(`Excluded languages: ${chalk.yellow(config.transifex.excludeLanguage
  * Streams
  * ---------------------------------------------------- */
 
-const finalTranslationsStream = transifexService.getFinalTranslationsStream();
-const writeFilesStream = filesService.getWriteFilesStream(finalTranslationsStream);
-const translationsFilesZipStream = rx.Observable.zip(finalTranslationsStream, writeFilesStream, _.concat);
-const uploadFilesStream = awsS3Service.getUploadFilesStream(translationsFilesZipStream).publish();
+const translationsStream = transifexService.getTranslationsPromiseStream();
+const writeFilesStream = filesService.getWriteFilesStream(translationsStream);
+const uploadFilesStream = awsS3Service.getUploadFilesStream(writeFilesStream).publish();
 
 /* -------------------------------------------------------
  * Subscriptions
@@ -88,13 +87,13 @@ transifexService.getLanguagesStream()
   }, [])
   .subscribe(languages => console.log(`Got ${chalk.green(_.size(languages))} languages for ${chalk.green(`${config.transifex.project}/${config.transifex.resource}`)}: ${languages.join(', ')}`));
 
-translationsFilesZipStream
+writeFilesStream
   .subscribe(res => {
     const [language, translations, filename] = res;
     console.log(`File ${chalk.green(filename.replace(`${process.env.PWD}/`, ''))} created with ${chalk.green(_.size(_.keys(translations)))} reviewed translations for the language: ${chalk.green(language)}${language === config.transifex.fallbackLanguage ? ' (fallback language)' : ''}`);
   }, null, uploadFilesStream.connect.bind(uploadFilesStream));
 
-translationsFilesZipStream
+writeFilesStream
   .zip(uploadFilesStream, _.concat)
   .subscribe(res => {
     const [, , filename, awsRes] = res;
